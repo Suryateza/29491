@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Typing Speed Game</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        background: linear-gradient(to right, #ff7e5f, #feb47b);
+        color: #fff;
+        font-family: 'Arial', sans-serif;
+      }
+      #game-area {
+        background: #fff;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        color: #333;
+      }
+      #word-display {
+        font-size: 2em;
+        font-weight: bold;
+      }
+      input#typing-input {
+        font-size: 1.5em;
+        text-align: center;
+      }
+      .modal-content {
+        background: linear-gradient(to right, #6a11cb, #2575fc);
+        color: #fff;
+      }
+      .shake {
+        animation: shake 0.5s;
+      }
+      @keyframes shake {
+        0% {
+          transform: translate(1px, 1px) rotate(0deg);
+        }
+        10% {
+          transform: translate(-1px, -2px) rotate(-1deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container my-5">
+      <h1 class="text-center mb-4">Typing Speed Game</h1>
+
+      <!-- Game Modes -->
+      <div class="d-flex justify-content-center mb-4">
+        <button id="timed-challenge" class="btn btn-primary mx-2">
+          Timed Challenge (60s)
+        </button>
+        <button id="endless-mode" class="btn btn-secondary mx-2">
+          Endless Mode
+        </button>
+        <button id="hard-mode" class="btn btn-danger mx-2">Hard Mode</button>
+      </div>
+
+      <!-- Typing Area -->
+      <div id="game-area" class="text-center">
+        <h3 id="word-display" class="mb-4"></h3>
+        <input
+          type="text"
+          id="typing-input"
+          class="form-control w-50 mx-auto"
+          placeholder="Type here..."
+          autocomplete="off"
+        />
+        <div id="feedback" class="mt-2"></div>
+      </div>
+
+      <!-- Stats Area -->
+      <div id="stats" class="text-center mt-4">
+        <p>Words Per Minute: <span id="wpm">0</span></p>
+        <p>Accuracy: <span id="accuracy">100%</span></p>
+        <p>Combo: <span id="combo">x1</span></p>
+        <p>Time Left: <span id="timer">∞</span> seconds</p>
+      </div>
+
+      <!-- Game Over Modal -->
+      <div
+        class="modal fade"
+        id="game-over-modal"
+        tabindex="-1"
+        aria-labelledby="gameOverLabel"
+        aria-hidden="true"
+      >
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="gameOverLabel">Game Over</h5>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Close"
+              ></button>
+            </div>
+            <div class="modal-body">
+              <p>Final Score: <span id="final-score"></span></p>
+              <p>WPM: <span id="final-wpm"></span></p>
+              <p>Accuracy: <span id="final-accuracy"></span></p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-success" id="restart-btn">
+                Restart
+              </button>
+              <button
+                type="button"
+                class="btn btn-info"
+                data-bs-toggle="modal"
+                data-bs-target="#leaderboard-modal"
+              >
+                View Leaderboard
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Leaderboard Modal -->
+      <div
+        class="modal fade"
+        id="leaderboard-modal"
+        tabindex="-1"
+        aria-labelledby="leaderboardLabel"
+        aria-hidden="true"
+      >
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="leaderboardLabel">Leaderboard</h5>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Close"
+              ></button>
+            </div>
+            <div class="modal-body">
+              <ul id="leaderboard-list" class="list-group"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      // Variables
+      let wordList = [
+        ['cat', 'dog', 'hat'],
+        ['apple', 'train', 'water'],
+        ['chocolate', 'symphony', 'exaggerate'],
+        ['pseudonym', 'amplification', 'anachronistic'],
+      ];
+      let currentWord = '';
+      let timer = 60;
+      let combo = 1;
+      let score = 0;
+      let accuracy = 100;
+      let totalWords = 0;
+      let correctWords = 0;
+      let wordsTyped = 0;
+      let interval;
+      let gameMode = 'timed';
+      let leaderboard = JSON.parse(localStorage.getItem('leaderboard')) || [];
+
+      // Select Elements
+      const wordDisplay = document.getElementById('word-display');
+      const typingInput = document.getElementById('typing-input');
+      const wpmDisplay = document.getElementById('wpm');
+      const accuracyDisplay = document.getElementById('accuracy');
+      const comboDisplay = document.getElementById('combo');
+      const feedback = document.getElementById('feedback');
+      const finalScore = document.getElementById('final-score');
+      const finalWPM = document.getElementById('final-wpm');
+      const finalAccuracy = document.getElementById('final-accuracy');
+      const modal = new bootstrap.Modal(
+        document.getElementById('game-over-modal')
+      );
+      const timerDisplay = document.getElementById('timer');
+      const leaderboardList = document.getElementById('leaderboard-list');
+
+      // Reset game state
+      function resetGame() {
+        currentWord = '';
+        timer = 60;
+        combo = 1;
+        score = 0;
+        accuracy = 100;
+        totalWords = 0;
+        correctWords = 0;
+        wordsTyped = 0;
+        wordDisplay.textContent = '';
+        typingInput.value = '';
+        feedback.textContent = '';
+        wpmDisplay.textContent = '0';
+        accuracyDisplay.textContent = '100%';
+        comboDisplay.textContent = 'x1';
+        timerDisplay.textContent = '60';
+        clearInterval(interval);
+      }
+
+      // Start the game
+      function startGame() {
+        resetGame();
+        setWord();
+        typingInput.focus();
+        typingInput.addEventListener('input', handleTyping);
+
+        if (gameMode === 'timed') {
+          interval = setInterval(updateGame, 1000);
+        } else if (gameMode === 'hard') {
+          interval = setInterval(updateGame, 500); // Decrease timer faster only in hard mode
+        } else {
+          timerDisplay.textContent = '∞'; // Infinite time for endless mode
+        }
+      }
+
+      // Set new word
+      function setWord() {
+        let wordArray;
+        if (gameMode === 'hard') {
+          wordArray = wordList[wordList.length - 1]; // Use hardest words only in hard mode
+        } else {
+          const difficultyLevel = Math.min(wordsTyped / 5, wordList.length - 1);
+          wordArray = wordList[Math.floor(difficultyLevel)];
+        }
+
+        currentWord = wordArray[Math.floor(Math.random() * wordArray.length)];
+        wordDisplay.textContent = currentWord;
+      }
+
+      // Handle typing input
+      function handleTyping() {
+        const typedValue = typingInput.value;
+        if (typedValue === currentWord) {
+          correctWords++;
+          wordsTyped++;
+          score += (gameMode === 'hard' ? 15 : 10) * combo; // Extra points in hard mode
+          combo++;
+          feedback.textContent = 'Correct!';
+          feedback.style.color = 'green';
+          typingInput.value = '';
+          setWord();
+        } else if (currentWord.indexOf(typedValue) !== 0) {
+          combo = 1;
+          feedback.textContent = 'Wrong!';
+          feedback.style.color = 'red';
+          typingInput.classList.add('shake');
+          setTimeout(() => typingInput.classList.remove('shake'), 500);
+        }
+
+        totalWords = correctWords + (typedValue.length > currentWord.length ? 1 : 0);
+        accuracy = (correctWords / totalWords) * 100;
+        accuracyDisplay.textContent = `${accuracy.toFixed(2)}%`;
+        comboDisplay.textContent = `x${combo}`;
+        wpmDisplay.textContent = `${(correctWords / ((60 - timer) / 60)).toFixed(1)} WPM`;
+      }
+
+      // Update game state
+      function updateGame() {
+        if (gameMode === 'timed' || gameMode === 'hard') {
+          if (timer > 0) {
+            timer--;
+            timerDisplay.textContent = timer;
+          } else {
+            endGame();
+          }
+        }
+      }
+
+      // End game
+      function endGame() {
+        clearInterval(interval);
+        finalScore.textContent = score;
+        finalWPM.textContent = wpmDisplay.textContent;
+        finalAccuracy.textContent = `${accuracy.toFixed(2)}%`;
+        modal.show();
+        saveScore();
+      }
+
+      // Save score to leaderboard
+      function saveScore() {
+        const playerName = prompt('Enter your name:');
+        leaderboard.push({
+          name: playerName,
+          score: score,
+          wpm: parseFloat(finalWPM.textContent),
+          accuracy: accuracy,
+        });
+        localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+        updateLeaderboard();
+      }
+
+      // Update leaderboard display
+      function updateLeaderboard() {
+        leaderboardList.innerHTML = '';
+        const sortedLeaderboard = leaderboard.sort((a, b) => b.score - a.score);
+        sortedLeaderboard.forEach(entry => {
+          const listItem = document.createElement('li');
+          listItem.classList.add('list-group-item');
+          listItem.textContent = `${entry.name} - Score: ${entry.score}, WPM: ${entry.wpm}, Accuracy: ${entry.accuracy.toFixed(2)}%`;
+          leaderboardList.appendChild(listItem);
+        });
+      }
+
+      // Restart game
+      document.getElementById('restart-btn').addEventListener('click', startGame);
+
+      // Select game mode
+      document.getElementById('timed-challenge').addEventListener('click', () => {
+        gameMode = 'timed';
+        timer = 60;
+        startGame();
+      });
+      document.getElementById('endless-mode').addEventListener('click', () => {
+        gameMode = 'endless';
+        timerDisplay.textContent = '∞';
+        startGame();
+      });
+      document.getElementById('hard-mode').addEventListener('click', () => {
+        gameMode = 'hard';
+        timer = 30; // Set lower time limit for hard mode
+        startGame();
+      });
+    </script>
+  </body>
+</html>

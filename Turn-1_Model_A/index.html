@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Typing Speed Game</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+    body {
+        background: linear-gradient(45deg, #ff9a9e, #fad0c4);
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    #gameArea {
+        background: rgba(255, 255, 255, 0.8);
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .word {
+        transition: all 0.3s;
+        display: inline-block;
+        margin: 5px;
+    }
+    .word.pop {
+        transform: scale(1.1);
+    }
+    .word.shake {
+        animation: shake 0.5s;
+    }
+    @keyframes shake {
+        0% { transform: translate(1px, 1px) rotate(0deg); }
+        10% { transform: translate(-1px, -2px) rotate(-1deg); }
+        /* ... shake animation keyframes ... */
+    }
+</style>
+</head>
+<body>
+
+<div id="gameArea" class="container">
+    <h1>Typing Speed Game</h1>
+    <div id="stats">
+        <span>WPM: <span id="wpm">0</span></span> | 
+        <span>Accuracy: <span id="accuracy">0%</span></span> | 
+        <span>Combo: <span id="combo">1x</span></span>
+    </div>
+    <div id="wordDisplay"></div>
+    <input type="text" id="typeInput" placeholder="Start typing here...">
+    <div id="gameModes">
+        <button onclick="startGame('Timed')">Timed Challenge</button>
+        <button onclick="startGame('Endless')">Endless Mode</button>
+        <button onclick="startGame('Hard')">Hard Mode</button>
+    </div>
+</div>
+
+<!-- Bootstrap Modal -->
+<div class="modal fade" id="resultModal" tabindex="-1" aria-labelledby="resultModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="resultModalLabel">Game Over</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Score: <span id="modalScore"></span></p>
+        <p>WPM: <span id="modalWPM"></span></p>
+        <p>Accuracy: <span id="modalAccuracy"></span></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" onclick="restartGame()">Restart</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const words = ["cat", "dog", "run", "jump", "fast", /* ... more words ... */];
+let currentWordIndex = 0, correctChars = 0, totalChars = 0, combo = 1, timer, mode = 'Timed', timeLeft = 60;
+
+function startGame(selectedMode) {
+    mode = selectedMode;
+    document.getElementById('wordDisplay').innerHTML = '';
+    currentWordIndex = 0;
+    correctChars = totalChars = 0;
+    combo = 1;
+    if (mode === 'Timed' || mode === 'Hard') {
+        timeLeft = 60;
+        timer = setInterval(updateTimer, 1000);
+    }
+    displayWord();
+    document.getElementById('typeInput').focus();
+}
+
+function displayWord() {
+    let word = words[currentWordIndex];
+    let display = word.split('').map(char => `<span>${char}</span>`).join('');
+    document.getElementById('wordDisplay').innerHTML = `<div class="word">${display}</div>`;
+}
+
+function updateTimer() {
+    if (timeLeft > 0) {
+        timeLeft--;
+    } else {
+        endGame();
+    }
+}
+
+function checkWord(input) {
+    let currentWord = words[currentWordIndex];
+    if (input === currentWord) {
+        correctChars += input.length;
+        totalChars += input.length;
+        combo++;
+        currentWordIndex++;
+        document.querySelector('.word').classList.add('pop');
+        displayWord();
+        updateStats();
+        if (mode === 'Hard') setTimeout(() => document.querySelector('.word').classList.add('shake'), 500);
+    } else {
+        combo = 1;
+    }
+    document.getElementById('typeInput').value = '';
+}
+
+function updateStats() {
+    let accuracy = totalChars ? (correctChars / totalChars * 100).toFixed(2) : 0;
+    let wpm = (correctChars / 5) / (60 - timeLeft) * 60; // Assuming average word length is 5
+    document.getElementById('wpm').textContent = isNaN(wpm) ? '0' : Math.round(wpm);
+    document.getElementById('accuracy').textContent = `${accuracy}%`;
+    document.getElementById('combo').textContent = `${combo}x`;
+}
+
+function endGame() {
+    clearInterval(timer);
+    document.getElementById('modalScore').textContent = correctChars * combo;
+    document.getElementById('modalWPM').textContent = document.getElementById('wpm').textContent;
+    document.getElementById('modalAccuracy').textContent = document.getElementById('accuracy').textContent;
+    const modal = new bootstrap.Modal(document.getElementById('resultModal'));
+    modal.show();
+}
+
+function restartGame() {
+    startGame(mode);
+}
+
+document.getElementById('typeInput').addEventListener('input', function(e) {
+    checkWord(this.value);
+});
+</script>
+
+</body>
+</html>
